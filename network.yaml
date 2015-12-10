@@ -1,0 +1,49 @@
+#
+# This is a hello world HOT template just defining a single compute
+# server.
+#
+heat_template_version: 2013-05-23
+
+description: >
+  demo template for setting up public and private network under nsxv env.
+parameters:
+  public_net:
+    type: string
+    default: e7ef060a-5ff9-4148-8a38-993951ed9da9
+
+
+  private_cidr:
+    type: string
+    default: "10.0.30.0/24"
+    description: cidr of private subnet
+
+resources:
+
+
+  private_network:
+    type: OS::Neutron::Net
+    properties:
+      name: "vxlan_net"
+  private_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      name: "private_subnet"
+      network_id: { get_resource: private_network}
+      ip_version : 4
+      cidr: {get_param: private_cidr}
+      dns_nameservers: ["10.20.20.1"]
+  router:
+    type: OS::Neutron::Router
+    properties:
+      name: nsxv_router_demo
+      value_specs: {"router_type": "exclusive"}
+  router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: {get_resource: router}
+      subnet_id: {get_resource: private_subnet}
+  router_gateway:
+    type: OS::Neutron::RouterGateway
+    properties:
+      router_id: {get_resource: router}
+      network_id: {get_param: public_net}

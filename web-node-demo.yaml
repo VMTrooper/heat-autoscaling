@@ -1,0 +1,56 @@
+heat_template_version: 2013-05-23
+description: A load-balancer server
+parameters:
+  image:
+    type: string
+    description: Image used for servers
+  key_name:
+    type: string
+    description: SSH key to connect to the servers
+  flavor:
+    type: string
+    description: flavor used by the servers
+  pool_id:
+    type: string
+    description: Pool to contact
+  metadata:
+    type: json
+  private_net_id:
+    type: string
+resources:
+  server_id:
+    type: OS::Heat::RandomString
+    properties:
+      length: 16
+      sequence: lettersdigits
+  server:
+    type: OS::Nova::Server
+    properties:
+      flavor: {get_param: flavor}
+      image: {get_param: image}
+      key_name: {get_param: key_name}
+      metadata: {get_param: metadata}
+      networks:
+        - network: {get_param: private_net_id}
+      user_data_format: RAW
+      user_data: |
+        #!/bin/bash -ex
+        touch /home/ubuntu/index.html
+        export local_ip=$(ifconfig eth0|grep 'inet addr'|awk -F: '{print $2}'| awk '{print $1}')
+        echo "You are connected to <b>$HOSTNAME</b> at <b>$local_ip</b>" >> /home/ubuntu/index.html
+        cd /home/ubuntu; sudo python -m SimpleHTTPServer 80 &
+        touch /home/ubuntu/web-stress.sh
+        echo "fulload() { dd if=/dev/zero of=/dev/null | dd if=/dev/zero of=/dev/null | dd if=/dev/zero of=/dev/null | dd if=/dev/zero of=/dev/null & }; fulload; read; killall dd" > /home/ubuntu/web-stress.sh
+        chmod +rx /home/ubuntu/web-stress.sh
+    #/home/ubuntu/web-stress.sh
+  member:
+    type: OS::Neutron::PoolMember
+    properties:
+      pool_id: {get_param: pool_id}
+      address: {get_attr: [server, first_address]}
+      protocol_port: 80
+
+outputs:
+  server_networks:
+    description: The networks of the deployed server
+    value: { get_attr: [server, networks] }
